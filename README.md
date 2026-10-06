@@ -20,7 +20,7 @@ NothiSetu turns a tender requirements file and a folder of PDFs into a validated
 6. Produces one PDF with an English cover, optional package index, all matched documents in requirement order, and `tender_id | Page X of Y` below every page without covering source content.
 7. Provides PDF previews, a UTF-8 CSV checklist export, responsive layouts, motion with reduced-motion support, and an English/Bangla interface with locally hosted Bengali fonts.
 
-8. Offers a paper-textured workspace with the supplied NothiSetu logo, animated document stacks, checklist search/status filters, a visible match summary, undo, and a one-click official sample.
+8. Offers a reference-matched pastel workspace with graph-paper texture, bold black outlines and offset shadows with the supplied NothiSetu logo, animated document stacks, checklist search/status filters, a visible match summary, undo, and a one-click official sample.
 9. Keeps unnamed scans for manual review, prevents confusing related financial documents, and clears old expiry dates when a file is replaced.
 10. Exports Bengali filenames and metadata with embedded fonts, preserves rotated pages, supports blank separator pages, and validates the package independently of the interface.
 
