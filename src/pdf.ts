@@ -1,5 +1,7 @@
-import { PDFDocument, PageSizes, StandardFonts, rgb, type PDFFont, type PDFPage } from 'pdf-lib';
+import { PDFDocument, PageSizes, StandardFonts, rgb, degrees, type PDFFont, type PDFPage } from 'pdf-lib';
 import type { AssignmentState, Requirement, RequirementsData, UploadedPdf } from './engine';
+import { canAssignFile, getRequirementStatus, isBlockingStatus } from './engine.ts';
+import 'regenerator-runtime/runtime.js';
 
 interface PackageOptions {
   data: RequirementsData;
@@ -18,6 +20,13 @@ export interface PackageResult {
 const A4_WIDTH = PageSizes.A4[0];
 const A4_HEIGHT = PageSizes.A4[1];
 const FOOTER_HEIGHT = 38;
+
+function fitText(text: string, font: PDFFont, size: number, width: number): string {
+  if (font.widthOfTextAtSize(text, size) <= width) return text;
+  const characters = Array.from(text);
+  while (characters.length && font.widthOfTextAtSize(characters.join('') + '...', size) > width) characters.pop();
+  return characters.join('') + '...';
+}
 
 function wrapText(text: string, font: PDFFont, size: number, maxWidth: number): string[] {
   const words = text.split(/\s+/);
@@ -57,6 +66,7 @@ function includedRequirements(
   matches: AssignmentState['matches'],
 ): Array<{ requirement: Requirement; file: UploadedPdf }> {
   return requirements
+    .slice().sort((a, b) => a.order - b.order)
     .map((requirement) => ({ requirement, file: files.find((file) => file.id === matches[requirement.id]) }))
     .filter((item): item is { requirement: Requirement; file: UploadedPdf } => Boolean(item.file));
 }
@@ -97,8 +107,8 @@ function drawCover(
     const number = String(index + 1);
     const numberWidth = bold.widthOfTextAtSize(number, 7);
     page.drawText(number, { x: 65 - numberWidth / 2, y, size: 7, font: bold, color: rgb(1, 1, 1) });
-    page.drawText(requirement.title_en, { x: 83, y, size: listSize, font: bold, color: rgb(0.08, 0.15, 0.13) });
-    const fileLabel = file.name.length > 45 ? `${file.name.slice(0, 42)}...` : file.name;
+    page.drawText(fitText(requirement.title_en, bold, listSize, 205), { x: 83, y, size: listSize, font: bold, color: rgb(0.08, 0.15, 0.13) });
+    const fileLabel = fitText(file.name, regular, 8, 191);
     page.drawText(`${file.pages} page${file.pages === 1 ? '' : 's'} · ${fileLabel}`, { x: 300, y, size: 8, font: regular, color: rgb(0.42, 0.47, 0.44) });
     y -= lineHeight;
   });
@@ -121,7 +131,7 @@ function drawIndex(
   let startPage = 3;
   included.forEach(({ requirement, file }, index) => {
     page.drawText(String(index + 1).padStart(2, '0'), { x: 58, y, size: 10, font: bold, color: rgb(0.78, 0.39, 0.08) });
-    page.drawText(requirement.title_en, { x: 94, y, size: 10.5, font: bold, color: rgb(0.09, 0.16, 0.14) });
+    page.drawText(fitText(requirement.title_en, bold, 10.5, 340), { x: 94, y, size: 10.5, font: bold, color: rgb(0.09, 0.16, 0.14) });
     const pageLabel = `Page ${startPage}`;
     page.drawText(pageLabel, { x: 520 - regular.widthOfTextAtSize(pageLabel, 9), y, size: 9, font: regular, color: rgb(0.34, 0.4, 0.37) });
     page.drawLine({ start: { x: 94, y: y - 7 }, end: { x: 520, y: y - 7 }, thickness: 0.35, color: rgb(0.85, 0.85, 0.8) });
@@ -133,6 +143,15 @@ function drawIndex(
 
 export async function createTenderPackage(options: PackageOptions): Promise<PackageResult> {
   const { data, files, assignments, includeIndex, madeOn } = options;
+  for (const requirement of data.requirements) {
+    const fileId = assignments.matches[requirement.id];
+    if (isBlockingStatus(getRequirementStatus(requirement, fileId, assignments.expiries[requirement.id], data.tender.submission_deadline))) {
+      throw new Error(`Resolve this document before exporting: ${requirement.title_en}`);
+    }
+    if (fileId && !canAssignFile(requirement.id, fileId, files, assignments.matches)) {
+      throw new Error(`Missing or duplicate document: ${requirement.title_en}`);
+    }
+  }
   const included = includedRequirements(data.requirements, files, assignments.matches);
   const output = await PDFDocument.create();
   output.setTitle(`${data.tender.tender_id} Tender Package`);
@@ -140,18 +159,44 @@ export async function createTenderPackage(options: PackageOptions): Promise<Pack
   output.setCreator('NothiSetu Tender Package Studio');
   output.setProducer('NothiSetu · pdf-lib');
   output.setCreationDate(new Date());
-  const regular = await output.embedFont(StandardFonts.Helvetica);
-  const bold = await output.embedFont(StandardFonts.HelveticaBold);
+  const textValues = [...Object.values(data.tender), ...included.flatMap(({ requirement, file }) => [requirement.title_en, file.name])];
+  let regular: PDFFont;
+  let bold: PDFFont;
+  if (textValues.some((text) => /[^\x20-\x7E\u00A0-\u00FF]/.test(text))) {
+    const [{ default: fontkit }, fontBytes] = await Promise.all([
+      import('@pdf-lib/fontkit'),
+      Promise.all(['Regular', 'Bold'].map(async (weight) => {
+        const response = await fetch(`/fonts/HindSiliguri-${weight}.ttf`);
+        if (!response.ok) throw new Error('Could not load the local Bengali font. Please retry.');
+        return response.arrayBuffer();
+      })),
+    ]);
+    output.registerFontkit(fontkit);
+    [regular, bold] = await Promise.all(fontBytes.map((bytes) => output.embedFont(bytes, { subset: true })));
+  } else {
+    [regular, bold] = await Promise.all([output.embedFont(StandardFonts.Helvetica), output.embedFont(StandardFonts.HelveticaBold)]);
+  }
 
   drawCover(output, data, included, madeOn, regular, bold);
   if (includeIndex) drawIndex(output, data, included, regular, bold);
 
   for (const { file } of included) {
-    const embeddedPages = await output.embedPdf(file.bytes, Array.from({ length: file.pages }, (_, index) => index));
-    for (const embedded of embeddedPages) {
-      const page = output.addPage([embedded.width, embedded.height + FOOTER_HEIGHT]);
-      page.drawRectangle({ x: 0, y: 0, width: embedded.width, height: FOOTER_HEIGHT, color: rgb(1, 1, 1) });
-      page.drawPage(embedded, { x: 0, y: FOOTER_HEIGHT, width: embedded.width, height: embedded.height });
+    const source = await PDFDocument.load(file.bytes, { updateMetadata: false });
+    // Flatten visible form fields into the source appearance before embedding pages.
+    if (source.getForm().getFields().length) source.getForm().flatten();
+    for (const sourcePage of source.getPages()) {
+      const rotation = ((sourcePage.getRotation().angle % 360) + 360) % 360;
+      const swapped = rotation === 90 || rotation === 270;
+      // A blank separator page may have no Contents stream at all.
+      if (!sourcePage.node.Contents()) sourcePage.drawRectangle({ x: 0, y: 0, width: sourcePage.getWidth(), height: sourcePage.getHeight(), color: rgb(1, 1, 1) });
+      const embedded = await output.embedPage(sourcePage);
+      const width = swapped ? embedded.height : embedded.width;
+      const height = swapped ? embedded.width : embedded.height;
+      const page = output.addPage([width, height + FOOTER_HEIGHT]);
+      page.drawRectangle({ x: 0, y: 0, width, height: FOOTER_HEIGHT, color: rgb(1, 1, 1) });
+      const x = rotation === 180 ? embedded.width : rotation === 270 ? embedded.height : 0;
+      const y = FOOTER_HEIGHT + (rotation === 90 ? embedded.width : rotation === 180 ? embedded.height : 0);
+      page.drawPage(embedded, { x, y, width: embedded.width, height: embedded.height, rotate: degrees(-rotation) });
     }
   }
 
@@ -165,6 +210,6 @@ export async function createTenderPackage(options: PackageOptions): Promise<Pack
   });
 
   const bytes = await output.save();
-  return { bytes, pageCount: pages.length, fileName: `${data.tender.tender_id}_Package.pdf` };
+  return { bytes, pageCount: pages.length, fileName: `${data.tender.tender_id.replace(/[<>:"/\\|?*\x00-\x1F]/g, '_')}_Package.pdf` };
 }
 

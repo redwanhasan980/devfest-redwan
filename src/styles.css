@@ -363,3 +363,6 @@ footer { border-top:1px solid #d8dacb; padding-top:18px; font-size:10px; color:#
 
 [lang=bn] { font-family:"Hind Siliguri","Nirmala UI",sans-serif; }
 [lang=bn] .hero h2,[lang=bn] .section-heading h3,[lang=bn] .readiness-top h3,[lang=bn] .empty-workspace h3 { font-family:"Hind Siliguri","Nirmala UI",sans-serif; }
+
+@media (max-width:1120px) { .sidebar .nav-label { display:none; } .nav-item svg { flex:0 0 auto; } }
+@media (max-width:640px) { .hero.compact { min-height:245px; } }

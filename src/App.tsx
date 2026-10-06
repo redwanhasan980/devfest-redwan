@@ -3,7 +3,7 @@ import {
   AlertTriangle, Archive, Check, CheckCircle2, ChevronRight, CircleAlert, Clock3, Download,
   Eye, FileCheck2, FileJson2, FileStack, FileText, FolderOpen, Globe2, HardDrive, Languages,
   LayoutDashboard, ListChecks, LoaderCircle, LockKeyhole, PackageCheck, Plus, RefreshCcw,
-  ShieldCheck, Sparkles, Trash2, UploadCloud, Wand2, X, Search, Undo2, FlaskConical, ArrowUpRight, FileDown, ScanLine, CalendarClock,
+  ShieldCheck, Sparkles, Trash2, UploadCloud, Wand2, X, Search, Undo2, FlaskConical, ArrowUpRight, FileDown, ScanLine, CalendarClock, CalendarX2,
 } from 'lucide-react';
 import { PDFDocument } from 'pdf-lib';
 import {
@@ -37,7 +37,7 @@ function csvCell(value: string | number): string {
 }
 
 function StatusPill({ status, language }: { status: RequirementStatus; language: Language }) {
-  const Icon = status === 'ok' ? CheckCircle2 : status === 'not-provided' ? Clock3 : status === 'expired' || status === 'expiry-needed' ? CalendarClock : CircleAlert;
+  const Icon = status === 'ok' ? CheckCircle2 : status === 'not-provided' ? Clock3 : status === 'expired' ? CalendarX2 : status === 'expiry-needed' ? CalendarClock : CircleAlert;
   return <span className={`status-pill status-${status}`}><Icon size={14} />{statusLabel(language, status)}</span>;
 }
 
@@ -288,14 +288,14 @@ export default function App() {
     <aside className="sidebar">
       <a className="brand-mark" href="#workspace" aria-label="NothiSetu home"><span className="brand-logo"><img src="/nothisetu-logo.png" alt="NothiSetu — Tender Package Studio" /></span></a>
       <nav aria-label="Primary navigation">
-        <a className="nav-item active" href="#workspace"><LayoutDashboard size={18} />{t(language, 'workspace')}</a>
-        <a className="nav-item" href="#library"><Archive size={18} />{t(language, 'documents')}<span className="nav-count">{files.length}</span></a>
-        <a className="nav-item" href="#package"><PackageCheck size={18} />{t(language, 'package')}</a>
+        <a className="nav-item active" href="#workspace" aria-label={t(language, 'workspace')}><LayoutDashboard size={18} /><span className="nav-label">{t(language, 'workspace')}</span></a>
+        <a className="nav-item" href="#library" aria-label={t(language, 'documents')}><Archive size={18} /><span className="nav-label">{t(language, 'documents')}</span><span className="nav-count">{files.length}</span></a>
+        <a className="nav-item" href="#package" aria-label={t(language, 'package')}><PackageCheck size={18} /><span className="nav-label">{t(language, 'package')}</span></a>
       </nav>
       <div className="privacy-note"><ShieldCheck size={20} /><span>{t(language, 'privateNote')}</span></div>
     </aside>
 
-    <main id="workspace" aria-busy={processing || generating || demoLoading} inert={generating || !!preview ? true : undefined}>
+    <main id="workspace" aria-busy={processing || generating || demoLoading} inert={generating || demoLoading || !!preview ? true : undefined}>
       <header className="topbar">
         <div><span className="eyebrow">{data?.tender.tender_id ?? 'AI DEVFEST 2026'}</span><h1>{data ? data.tender.title : t(language, 'tagline')}</h1></div>
         <div className="top-actions">
