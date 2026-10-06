@@ -227,6 +227,9 @@ export default function App() {
   const activeStep = !data ? 1 : blockers.length ? 2 : 3;
 
   return <div className="app-shell" lang={language === 'bn' ? 'bn' : 'en'}>
+    <svg className="decorative-blob blob-mint" viewBox="0 0 320 280" aria-hidden="true"><path d="M51 51C97 5 184 0 252 32c68 32 79 106 42 165-37 59-119 91-189 70-70-21-111-84-90-141 8-24 18-51 36-75Z" /></svg>
+    <svg className="decorative-blob blob-pink" viewBox="0 0 300 260" aria-hidden="true"><path d="M34 70C70 15 149-7 216 21c67 28 99 99 69 157-30 58-123 91-190 70C28 227-18 150 8 99c7-14 16-24 26-29Z" /></svg>
+    <svg className="decorative-blob blob-yellow" viewBox="0 0 240 220" aria-hidden="true"><path d="M29 55C63 9 140-6 192 28c52 34 60 105 22 151-38 46-116 53-168 18C-6 162-7 105 29 55Z" /></svg>
     <aside className="sidebar">
       <div className="brand-mark"><span className="brand-icon"><FileStack size={24} /></span><span><strong>{t(language, 'appName')}</strong><small>{t(language, 'tagline')}</small></span></div>
       <nav aria-label="Primary navigation">
@@ -262,6 +265,12 @@ export default function App() {
           return <div className={`step ${step === activeStep ? 'active' : ''} ${complete ? 'complete' : ''}`} key={label}><span>{complete ? <Check size={15} /> : step}</span><strong>{label}</strong></div>;
         })}
       </section>
+
+      {data && <section className="top-progress-card" aria-label={t(language, 'readiness')}>
+        <div className="progress-copy"><span>{t(language, 'readiness')}</span><strong>{progress}%</strong><small>{language === 'bn' ? 'সম্পন্ন' : 'Completed'}</small></div>
+        <div className="top-progress-detail"><div><strong>{readyCount} / {rows.length}</strong><span>{language === 'bn' ? 'নথি পরীক্ষায় উত্তীর্ণ' : 'documents cleared'}</span></div><div className="outlined-progress"><span style={{ width: `${progress}%` }} /></div></div>
+        <div className={`progress-sticker ${blockers.length ? 'needs-work' : 'complete'}`}>{blockers.length ? <CircleAlert size={17} /> : <CheckCircle2 size={17} />}{blockers.length ? `${blockers.length} ${language === 'bn' ? 'টি বাকি' : 'to resolve'}` : t(language, 'ready')}</div>
+      </section>}
 
       <input ref={requirementsInput} hidden type="file" accept="application/json,.json" onChange={handleRequirementsChange} />
       <input ref={pdfInput} hidden multiple type="file" accept="application/pdf,.pdf" onChange={(event) => void processFiles(Array.from(event.target.files ?? []))} />
