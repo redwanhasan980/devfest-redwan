@@ -48,7 +48,8 @@ const datePattern = /^\d{4}-\d{2}-\d{2}$/;
 export function isValidDateOnly(value: unknown): value is string {
   if (typeof value !== 'string' || !datePattern.test(value)) return false;
   const [year, month, day] = value.split('-').map(Number);
-  const date = new Date(Date.UTC(year, month - 1, day));
+  const date = new Date(0);
+  date.setUTCFullYear(year, month - 1, day);
   return (
     date.getUTCFullYear() === year &&
     date.getUTCMonth() === month - 1 &&
@@ -96,6 +97,7 @@ export function parseRequirements(input: unknown): RequirementsData {
   const requirements = input.requirements.map((item, index): Requirement => {
     if (!isRecord(item)) throw new Error(`Requirement ${index + 1} is invalid.`);
     const id = requiredText(item, 'id');
+    if (['__proto__', 'constructor', 'prototype'].includes(id)) throw new Error(`Reserved requirement id: ${id}`);
     const order = item.order;
     if (!Number.isInteger(order) || Number(order) < 1) {
       throw new Error(`Requirement ${id} has an invalid order.`);
@@ -167,9 +169,9 @@ const genericWords = new Set([
 
 const canonicalWords: Record<string, string> = {
   licence: 'license', authorisation: 'authorization', authorised: 'authorization', authorized: 'authorization',
-  tech: 'technical', fin: 'financial', audited: 'audit', auditing: 'audit', accounts: 'financial',
+  tech: 'technical', fin: 'financial', audited: 'audit', auditing: 'audit',
   quotation: 'price', pricing: 'price', quote: 'price', boq: 'price',
-  undertaking: 'declaration', affidavit: 'declaration', compliance: 'declaration',
+  undertaking: 'declaration', affidavit: 'declaration',
   completed: 'experience', completion: 'experience', performance: 'experience',
   manufacturer: 'manufacturer', manufacturers: 'manufacturer', manufacture: 'manufacturer',
 };
@@ -185,14 +187,36 @@ const documentLexicon: DocumentConcept[] = [
   { signals: ['audit financial', 'financial statement', 'নিরীক্ষিত আর্থিক', 'আর্থিক বিবরণী'], aliases: ['audited financial', 'audit report', 'financial statement', 'balance sheet', 'income statement', 'annual accounts', 'নিরীক্ষিত আর্থিক বিবরণী', 'অডিট রিপোর্ট', 'আর্থিক বিবরণী', 'ব্যালেন্স শিট', 'আয় বিবরণী'] },
   { signals: ['manufacturer', 'প্রস্তুতকারক'], aliases: ['manufacturer authorization', 'manufacturer authorisation', 'manufacturers authorization', 'maf', 'oem authorization', 'oem authorisation', 'authorization letter', 'authorisation letter', 'প্রস্তুতকারকের অনুমোদন', 'উৎপাদনকারীর অনুমোদন', 'ম্যানুফ্যাকচারার অথরাইজেশন', 'ওইএম অনুমোদন'] },
   { signals: ['technical', 'কারিগরি'], aliases: ['technical', 'technical offer', 'technical bid', 'tech proposal', 'specification', 'compliance sheet', 'কারিগরি', 'কারিগরি প্রস্তাব', 'টেকনিক্যাল প্রস্তাব', 'প্রযুক্তিগত প্রস্তাব', 'বিস্তারিত কারিগরি বিবরণ'] },
-  { signals: ['financial proposal', 'financial', 'আর্থিক প্রস্তাব'], aliases: ['financial proposal', 'financial offer', 'price proposal', 'price schedule', 'priced boq', 'boq', 'quotation', 'commercial offer', 'আর্থিক প্রস্তাব', 'মূল্য প্রস্তাব', 'দর প্রস্তাব', 'মূল্য তালিকা', 'বিওকিউ', 'বাণিজ্যিক প্রস্তাব'] },
+  { signals: ['financial proposal', 'financial offer', 'price schedule', 'price proposal', 'commercial offer', 'bill of quantities', 'আর্থিক প্রস্তাব'], aliases: ['financial proposal', 'financial offer', 'financial bid', 'price proposal', 'price schedule', 'priced boq', 'boq', 'bill of quantities', 'quotation', 'commercial offer', 'commercial bid', 'আর্থিক প্রস্তাব', 'মূল্য প্রস্তাব', 'দর প্রস্তাব', 'মূল্য তালিকা', 'বিওকিউ', 'বাণিজ্যিক প্রস্তাব'] },
   { signals: ['declaration', 'ঘোষণাপত্র'], aliases: ['declaration', 'signed declaration', 'undertaking', 'affidavit', 'declaration form', 'compliance declaration', 'ঘোষণা', 'ঘোষণাপত্র', 'স্বাক্ষরিত ঘোষণাপত্র', 'অঙ্গীকারনামা', 'হলফনামা', 'সম্মতিপত্র'] },
+  { signals: ['tender security', 'bid security', 'দরপত্র জামানত'], aliases: ['tender security', 'bid security', 'earnest money', 'emd', 'bid bond', 'pay order', 'দরপত্র জামানত', 'বিড সিকিউরিটি', 'আর্নেস্ট মানি', 'পে অর্ডার'] },
+  { signals: ['performance security', 'performance guarantee', 'কার্যসম্পাদন জামানত'], aliases: ['performance security', 'performance guarantee', 'performance bond', 'কার্যসম্পাদন জামানত', 'পারফরম্যান্স গ্যারান্টি'] },
+  { signals: ['power of attorney', 'আমমোক্তারনামা'], aliases: ['power of attorney', 'poa', 'signatory authorization', 'signatory authorisation', 'authorized signatory', 'আমমোক্তারনামা', 'ক্ষমতাপত্র', 'স্বাক্ষরকারীর অনুমোদন'] },
+  { signals: ['incorporation', 'নিগমিতকরণ'], aliases: ['incorporation', 'company registration', 'rjsc', 'নিগমিতকরণ', 'কোম্পানি নিবন্ধন', 'আরজেএসসি'] },
+  { signals: ['memorandum', 'articles of association', 'সংঘস্মারক'], aliases: ['memorandum of association', 'articles of association', 'moa', 'aoa', 'সংঘস্মারক', 'সংঘবিধি'] },
+  { signals: ['tax clearance', 'tax return', 'আয়কর প্রত্যয়ন'], aliases: ['tax clearance', 'tax return', 'income tax return', 'return submission', 'tax acknowledgement', 'tax acknowledgment', 'আয়কর প্রত্যয়ন', 'কর পরিশোধ', 'আয়কর রিটার্ন', 'রিটার্ন দাখিল'] },
+  { signals: ['bank statement', 'ব্যাংক বিবরণী'], aliases: ['bank statement', 'account statement', 'transaction statement', 'ব্যাংক বিবরণী', 'হিসাব বিবরণী'] },
+  { signals: ['credit line', 'line of credit', 'ঋণসীমা'], aliases: ['credit line', 'line of credit', 'credit facility', 'liquid assets', 'ঋণসীমা', 'ঋণ সুবিধা', 'তরল সম্পদ'] },
+  { signals: ['turnover', 'বার্ষিক লেনদেন'], aliases: ['turnover', 'annual turnover', 'sales revenue', 'বার্ষিক লেনদেন', 'টার্নওভার', 'বিক্রয় রাজস্ব'] },
+  { signals: ['iso', 'quality certification', 'মান সনদ'], aliases: ['iso', 'quality certification', 'quality management', 'qms', 'আইএসও', 'মান সনদ', 'মান ব্যবস্থাপনা'] },
+  { signals: ['joint venture', 'যৌথ উদ্যোগ'], aliases: ['joint venture', 'jv agreement', 'jvca', 'consortium agreement', 'যৌথ উদ্যোগ', 'যৌথ চুক্তি'] },
+  { signals: ['company profile', 'কোম্পানি পরিচিতি'], aliases: ['company profile', 'corporate profile', 'business profile', 'কোম্পানি পরিচিতি', 'প্রতিষ্ঠান পরিচিতি'] },
+  { signals: ['delivery schedule', 'work schedule', 'সরবরাহ সময়সূচি'], aliases: ['delivery schedule', 'work schedule', 'implementation schedule', 'delivery plan', 'সরবরাহ সময়সূচি', 'কর্মপরিকল্পনা', 'বাস্তবায়ন পরিকল্পনা'] },
+  { signals: ['warranty', 'ওয়ারেন্টি'], aliases: ['warranty', 'warrantee', 'after sales service', 'ওয়ারেন্টি', 'বিক্রয়োত্তর সেবা'] },
+  { signals: ['national id', 'জাতীয় পরিচয়পত্র'], aliases: ['national id', 'national identity', 'nid', 'জাতীয় পরিচয়পত্র', 'এনআইডি'] },
+  { signals: ['import registration', 'আমদানি নিবন্ধন'], aliases: ['import registration', 'irc', 'আমদানি নিবন্ধন', 'আইআরসি'] },
+  { signals: ['export registration', 'রপ্তানি নিবন্ধন'], aliases: ['export registration', 'erc', 'রপ্তানি নিবন্ধন', 'ইআরসি'] },
+  { signals: ['environmental clearance', 'পরিবেশ ছাড়পত্র'], aliases: ['environmental clearance', 'environment clearance', 'doe clearance', 'পরিবেশ ছাড়পত্র', 'পরিবেশগত ছাড়পত্র'] },
+  { signals: ['fire license', 'অগ্নি লাইসেন্স'], aliases: ['fire license', 'fire licence', 'fire safety', 'অগ্নি লাইসেন্স', 'ফায়ার লাইসেন্স'] },
+  { signals: ['insurance', 'বীমা'], aliases: ['insurance', 'insurance policy', 'বীমা', 'বিমা', 'বীমা পলিসি'] },
 ];
+
+export const matcherStats = { categories: documentLexicon.length, aliases: documentLexicon.reduce((sum, concept) => sum + concept.aliases.length, 0) };
 
 function normalized(value: string): string {
   return value
     .normalize('NFKD')
-    .replace(/\.[^.]+$/, '')
+    .replace(/\.pdf$/i, '')
     .replace(/([a-z])([A-Z])/g, '$1 $2')
     .toLowerCase()
     .replace(/[^\p{L}\p{M}\p{N}]+/gu, ' ')
@@ -225,7 +249,6 @@ function compareFilePreference(a: UploadedPdf, b: UploadedPdf): number {
 export function matchScore(fileName: string, requirementTitle: string, alternateTitle = ''): number {
   const fileText = normalized(fileName);
   const titleTexts = [requirementTitle, alternateTitle].filter(Boolean).map(normalized);
-  const titleText = titleTexts.join(' ');
   const fileTokens = new Set(tokens(fileName));
   const titleTokens = [...new Set(titleTexts.flatMap((title) => tokens(title)))];
   let score = titleTokens.length
@@ -234,7 +257,13 @@ export function matchScore(fileName: string, requirementTitle: string, alternate
 
   if (titleTexts.some((title) => title && hasPhrase(fileText, title))) score = Math.max(score, 1);
 
-  const targetConcepts = documentLexicon.filter((concept) => concept.signals.some((signal) => titleTexts.some((title) => hasPhrase(title, signal))));
+  // Prefer specific phrases: financial statements and financial bids are different documents.
+  const conceptStrength = (concept: DocumentConcept, texts: string[]) => Math.max(0, ...[...concept.signals, ...concept.aliases].filter((alias) => texts.some((text) => hasPhrase(text, alias))).map((alias) => tokens(alias, true).length));
+  const targetStrength = Math.max(0, ...documentLexicon.map((concept) => conceptStrength(concept, titleTexts)));
+  const targetConcepts = documentLexicon.filter((concept) => targetStrength > 0 && conceptStrength(concept, titleTexts) === targetStrength);
+  const fileStrength = Math.max(0, ...documentLexicon.map((concept) => conceptStrength(concept, [fileText])));
+  const fileConcepts = documentLexicon.filter((concept) => fileStrength > 0 && conceptStrength(concept, [fileText]) === fileStrength);
+  if (targetConcepts.length && fileConcepts.length && !targetConcepts.some((concept) => fileConcepts.includes(concept))) return 0;
   for (const concept of targetConcepts) {
     for (const alias of concept.aliases) {
       if (hasPhrase(fileText, alias)) {
@@ -252,7 +281,9 @@ export function suggestAssignments(
   files: UploadedPdf[],
   currentMatches: AssignmentState['matches'],
 ): AssignmentState['matches'] {
-  const matches = { ...currentMatches };
+  const validIds = new Set(files.map((file) => file.id));
+  const requirementIds = new Set(requirements.map((requirement) => requirement.id));
+  const matches = Object.fromEntries(Object.entries(currentMatches).filter(([id, fileId]) => requirementIds.has(id) && fileId && validIds.has(fileId)));
   const usedHashes = new Set<string>();
   const usedIds = new Set<string>();
   Object.values(matches).forEach((fileId) => {
@@ -275,7 +306,7 @@ export function suggestAssignments(
       file,
       score: matchScore(file.name, requirement.title_en, requirement.title_bn),
     })))
-    .filter(({ score }) => score >= 0.45)
+    .filter(({ score }) => score >= 0.6)
     .sort((a, b) => b.score - a.score || a.requirement.order - b.requirement.order || compareFilePreference(a.file, b.file));
 
   for (const candidate of candidates) {
@@ -285,14 +316,7 @@ export function suggestAssignments(
     usedHashes.add(candidate.file.hash);
   }
 
-  const remainingMandatory = requirements.filter((requirement) => requirement.mandatory && !matches[requirement.id]);
-  const alreadySatisfied = requirements.filter((requirement) => matches[requirement.id]);
-  const remainingFiles = uniqueAvailable
-    .filter((file) => !usedHashes.has(file.hash))
-    .filter((file) => !alreadySatisfied.some((requirement) => matchScore(file.name, requirement.title_en, requirement.title_bn) >= 0.45));
-  if (remainingMandatory.length === 1 && remainingFiles.length === 1) {
-    matches[remainingMandatory[0].id] = remainingFiles[0].id;
-  }
+  // Unnamed scans need human review; elimination is not evidence of document identity.
   return matches;
 }
 
