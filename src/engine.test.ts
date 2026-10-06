@@ -65,6 +65,14 @@ test('filename matching understands common tender-document aliases', () => {
   assert.equal(matchScore('technical_offer.pdf', 'Financial Proposal'), 0);
 });
 
+test('filename matching understands Bangla procurement terminology', () => {
+  assert.ok(matchScore('ট্রেড_লাইসেন্স_২০২৬.pdf', 'Trade License', 'ট্রেড লাইসেন্স') >= 0.8);
+  assert.ok(matchScore('বিআইএন_সনদ.pdf', 'VAT Registration Certificate', 'ভ্যাট নিবন্ধন সনদ') >= 0.8);
+  assert.ok(matchScore('কারিগরি_প্রস্তাব.pdf', 'Technical Proposal', 'কারিগরি প্রস্তাব') >= 0.8);
+  assert.ok(matchScore('স্বাক্ষরিত_ঘোষণাপত্র.pdf', 'Signed Declaration', 'স্বাক্ষরিত ঘোষণাপত্র') >= 0.8);
+  assert.equal(matchScore('আর্থিক_প্রস্তাব.pdf', 'Technical Proposal', 'কারিগরি প্রস্তাব'), 0);
+});
+
 test('suggestions deterministically collapse duplicate content', () => {
   const bytes = new Uint8Array([1]);
   const files: UploadedPdf[] = [

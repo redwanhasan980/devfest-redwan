@@ -161,6 +161,8 @@ export function canAssignFile(
 const genericWords = new Set([
   'certificate', 'cert', 'document', 'documents', 'proposal', 'registration', 'registered',
   'signed', 'copy', 'final', 'new', 'old', 'latest', 'valid', 'pdf', 'file',
+  'সনদ', 'সনদপত্র', 'দলিল', 'নথি', 'প্রস্তাব', 'নিবন্ধন', 'স্বাক্ষরিত',
+  'কপি', 'চূড়ান্ত', 'সর্বশেষ', 'বৈধ', 'পিডিএফ', 'ফাইল',
 ]);
 
 const canonicalWords: Record<string, string> = {
@@ -175,16 +177,16 @@ const canonicalWords: Record<string, string> = {
 interface DocumentConcept { signals: string[]; aliases: string[] }
 
 const documentLexicon: DocumentConcept[] = [
-  { signals: ['trade license'], aliases: ['trade license', 'trade licence', 'business license', 'business licence', 'tradelicense'] },
-  { signals: ['tin', 'tax identification'], aliases: ['tin', 'etin', 'e tin', 'tax identification', 'taxpayer identification', 'tax id'] },
-  { signals: ['vat', 'value added tax'], aliases: ['vat', 'bin', 'value added tax', 'business identification number', 'business identification'] },
-  { signals: ['bank solvency', 'solvency'], aliases: ['bank solvency', 'solvency', 'bank certificate', 'financial capability', 'financial capacity'] },
-  { signals: ['experience'], aliases: ['experience', 'work experience', 'completion', 'work completion', 'performance certificate', 'contract certificate', 'client certificate'] },
-  { signals: ['audit financial', 'financial statement'], aliases: ['audited financial', 'audit report', 'financial statement', 'balance sheet', 'income statement', 'annual accounts'] },
-  { signals: ['manufacturer'], aliases: ['manufacturer authorization', 'manufacturer authorisation', 'manufacturers authorization', 'maf', 'oem authorization', 'oem authorisation', 'authorization letter', 'authorisation letter'] },
-  { signals: ['technical'], aliases: ['technical', 'technical offer', 'technical bid', 'tech proposal', 'specification', 'compliance sheet'] },
-  { signals: ['financial proposal', 'financial'], aliases: ['financial proposal', 'financial offer', 'price proposal', 'price schedule', 'priced boq', 'boq', 'quotation', 'commercial offer'] },
-  { signals: ['declaration'], aliases: ['declaration', 'signed declaration', 'undertaking', 'affidavit', 'declaration form', 'compliance declaration'] },
+  { signals: ['trade license', 'ট্রেড লাইসেন্স'], aliases: ['trade license', 'trade licence', 'business license', 'business licence', 'tradelicense', 'ট্রেড লাইসেন্স', 'ব্যবসা লাইসেন্স', 'ব্যবসায়িক লাইসেন্স'] },
+  { signals: ['tin', 'tax identification', 'টিআইএন'], aliases: ['tin', 'etin', 'e tin', 'tax identification', 'taxpayer identification', 'tax id', 'টিআইএন', 'ই টিআইএন', 'ইটিআইএন', 'করদাতা শনাক্তকরণ', 'কর শনাক্তকরণ নম্বর'] },
+  { signals: ['vat', 'value added tax', 'ভ্যাট'], aliases: ['vat', 'bin', 'value added tax', 'business identification number', 'business identification', 'ভ্যাট', 'বিআইএন', 'মূল্য সংযোজন কর', 'ব্যবসায় শনাক্তকরণ নম্বর'] },
+  { signals: ['bank solvency', 'solvency', 'ব্যাংক সচ্ছলতা'], aliases: ['bank solvency', 'solvency', 'bank certificate', 'financial capability', 'financial capacity', 'ব্যাংক সচ্ছলতা', 'ব্যাংক সলভেন্সি', 'আর্থিক সক্ষমতা', 'ব্যাংক প্রত্যয়ন'] },
+  { signals: ['experience', 'অভিজ্ঞতা'], aliases: ['experience', 'work experience', 'completion', 'work completion', 'performance certificate', 'contract certificate', 'client certificate', 'অভিজ্ঞতা', 'কাজের অভিজ্ঞতা', 'কার্যসম্পাদন', 'কাজ সমাপ্তি', 'চুক্তি সম্পাদন'] },
+  { signals: ['audit financial', 'financial statement', 'নিরীক্ষিত আর্থিক', 'আর্থিক বিবরণী'], aliases: ['audited financial', 'audit report', 'financial statement', 'balance sheet', 'income statement', 'annual accounts', 'নিরীক্ষিত আর্থিক বিবরণী', 'অডিট রিপোর্ট', 'আর্থিক বিবরণী', 'ব্যালেন্স শিট', 'আয় বিবরণী'] },
+  { signals: ['manufacturer', 'প্রস্তুতকারক'], aliases: ['manufacturer authorization', 'manufacturer authorisation', 'manufacturers authorization', 'maf', 'oem authorization', 'oem authorisation', 'authorization letter', 'authorisation letter', 'প্রস্তুতকারকের অনুমোদন', 'উৎপাদনকারীর অনুমোদন', 'ম্যানুফ্যাকচারার অথরাইজেশন', 'ওইএম অনুমোদন'] },
+  { signals: ['technical', 'কারিগরি'], aliases: ['technical', 'technical offer', 'technical bid', 'tech proposal', 'specification', 'compliance sheet', 'কারিগরি', 'কারিগরি প্রস্তাব', 'টেকনিক্যাল প্রস্তাব', 'প্রযুক্তিগত প্রস্তাব', 'বিস্তারিত কারিগরি বিবরণ'] },
+  { signals: ['financial proposal', 'financial', 'আর্থিক প্রস্তাব'], aliases: ['financial proposal', 'financial offer', 'price proposal', 'price schedule', 'priced boq', 'boq', 'quotation', 'commercial offer', 'আর্থিক প্রস্তাব', 'মূল্য প্রস্তাব', 'দর প্রস্তাব', 'মূল্য তালিকা', 'বিওকিউ', 'বাণিজ্যিক প্রস্তাব'] },
+  { signals: ['declaration', 'ঘোষণাপত্র'], aliases: ['declaration', 'signed declaration', 'undertaking', 'affidavit', 'declaration form', 'compliance declaration', 'ঘোষণা', 'ঘোষণাপত্র', 'স্বাক্ষরিত ঘোষণাপত্র', 'অঙ্গীকারনামা', 'হলফনামা', 'সম্মতিপত্র'] },
 ];
 
 function normalized(value: string): string {
@@ -193,8 +195,8 @@ function normalized(value: string): string {
     .replace(/\.[^.]+$/, '')
     .replace(/([a-z])([A-Z])/g, '$1 $2')
     .toLowerCase()
-    .replace(/[^a-z0-9]+/g, ' ')
-    .replace(/\b\d+\b/g, ' ')
+    .replace(/[^\p{L}\p{M}\p{N}]+/gu, ' ')
+    .replace(/\p{N}+/gu, ' ')
     .replace(/\s+/g, ' ')
     .trim();
 }
@@ -220,18 +222,19 @@ function compareFilePreference(a: UploadedPdf, b: UploadedPdf): number {
     || a.name.localeCompare(b.name);
 }
 
-export function matchScore(fileName: string, requirementTitle: string): number {
+export function matchScore(fileName: string, requirementTitle: string, alternateTitle = ''): number {
   const fileText = normalized(fileName);
-  const titleText = normalized(requirementTitle);
+  const titleTexts = [requirementTitle, alternateTitle].filter(Boolean).map(normalized);
+  const titleText = titleTexts.join(' ');
   const fileTokens = new Set(tokens(fileName));
-  const titleTokens = [...new Set(tokens(requirementTitle))];
+  const titleTokens = [...new Set(titleTexts.flatMap((title) => tokens(title)))];
   let score = titleTokens.length
     ? titleTokens.filter((token) => fileTokens.has(token)).length / titleTokens.length
     : 0;
 
-  if (titleText && hasPhrase(fileText, titleText)) score = Math.max(score, 1);
+  if (titleTexts.some((title) => title && hasPhrase(fileText, title))) score = Math.max(score, 1);
 
-  const targetConcepts = documentLexicon.filter((concept) => concept.signals.some((signal) => hasPhrase(titleText, signal)));
+  const targetConcepts = documentLexicon.filter((concept) => concept.signals.some((signal) => titleTexts.some((title) => hasPhrase(title, signal))));
   for (const concept of targetConcepts) {
     for (const alias of concept.aliases) {
       if (hasPhrase(fileText, alias)) {
@@ -270,7 +273,7 @@ export function suggestAssignments(
     .flatMap((requirement) => uniqueAvailable.map((file) => ({
       requirement,
       file,
-      score: matchScore(file.name, requirement.title_en),
+      score: matchScore(file.name, requirement.title_en, requirement.title_bn),
     })))
     .filter(({ score }) => score >= 0.45)
     .sort((a, b) => b.score - a.score || a.requirement.order - b.requirement.order || compareFilePreference(a.file, b.file));
@@ -286,7 +289,7 @@ export function suggestAssignments(
   const alreadySatisfied = requirements.filter((requirement) => matches[requirement.id]);
   const remainingFiles = uniqueAvailable
     .filter((file) => !usedHashes.has(file.hash))
-    .filter((file) => !alreadySatisfied.some((requirement) => matchScore(file.name, requirement.title_en) >= 0.45));
+    .filter((file) => !alreadySatisfied.some((requirement) => matchScore(file.name, requirement.title_en, requirement.title_bn) >= 0.45));
   if (remainingMandatory.length === 1 && remainingFiles.length === 1) {
     matches[remainingMandatory[0].id] = remainingFiles[0].id;
   }
