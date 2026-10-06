@@ -158,23 +158,90 @@ export function canAssignFile(
   });
 }
 
-function tokens(value: string): string[] {
-  const stop = new Set(['certificate', 'document', 'proposal', 'registration', 'signed']);
+const genericWords = new Set([
+  'certificate', 'cert', 'document', 'documents', 'proposal', 'registration', 'registered',
+  'signed', 'copy', 'final', 'new', 'old', 'latest', 'valid', 'pdf', 'file',
+]);
+
+const canonicalWords: Record<string, string> = {
+  licence: 'license', authorisation: 'authorization', authorised: 'authorization', authorized: 'authorization',
+  tech: 'technical', fin: 'financial', audited: 'audit', auditing: 'audit', accounts: 'financial',
+  quotation: 'price', pricing: 'price', quote: 'price', boq: 'price',
+  undertaking: 'declaration', affidavit: 'declaration', compliance: 'declaration',
+  completed: 'experience', completion: 'experience', performance: 'experience',
+  manufacturer: 'manufacturer', manufacturers: 'manufacturer', manufacture: 'manufacturer',
+};
+
+interface DocumentConcept { signals: string[]; aliases: string[] }
+
+const documentLexicon: DocumentConcept[] = [
+  { signals: ['trade license'], aliases: ['trade license', 'trade licence', 'business license', 'business licence', 'tradelicense'] },
+  { signals: ['tin', 'tax identification'], aliases: ['tin', 'etin', 'e tin', 'tax identification', 'taxpayer identification', 'tax id'] },
+  { signals: ['vat', 'value added tax'], aliases: ['vat', 'bin', 'value added tax', 'business identification number', 'business identification'] },
+  { signals: ['bank solvency', 'solvency'], aliases: ['bank solvency', 'solvency', 'bank certificate', 'financial capability', 'financial capacity'] },
+  { signals: ['experience'], aliases: ['experience', 'work experience', 'completion', 'work completion', 'performance certificate', 'contract certificate', 'client certificate'] },
+  { signals: ['audit financial', 'financial statement'], aliases: ['audited financial', 'audit report', 'financial statement', 'balance sheet', 'income statement', 'annual accounts'] },
+  { signals: ['manufacturer'], aliases: ['manufacturer authorization', 'manufacturer authorisation', 'manufacturers authorization', 'maf', 'oem authorization', 'oem authorisation', 'authorization letter', 'authorisation letter'] },
+  { signals: ['technical'], aliases: ['technical', 'technical offer', 'technical bid', 'tech proposal', 'specification', 'compliance sheet'] },
+  { signals: ['financial proposal', 'financial'], aliases: ['financial proposal', 'financial offer', 'price proposal', 'price schedule', 'priced boq', 'boq', 'quotation', 'commercial offer'] },
+  { signals: ['declaration'], aliases: ['declaration', 'signed declaration', 'undertaking', 'affidavit', 'declaration form', 'compliance declaration'] },
+];
+
+function normalized(value: string): string {
   return value
-    .toLowerCase()
+    .normalize('NFKD')
     .replace(/\.[^.]+$/, '')
+    .replace(/([a-z])([A-Z])/g, '$1 $2')
+    .toLowerCase()
     .replace(/[^a-z0-9]+/g, ' ')
-    .trim()
+    .replace(/\b\d+\b/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function tokens(value: string, keepGeneric = false): string[] {
+  return normalized(value)
     .split(/\s+/)
-    .filter((token) => token.length > 1 && !stop.has(token));
+    .map((token) => canonicalWords[token] ?? token)
+    .filter((token) => token.length > 1 && (keepGeneric || !genericWords.has(token)));
+}
+
+function hasPhrase(text: string, phrase: string): boolean {
+  const normalizedPhrase = normalized(phrase);
+  return (` ${text} `).includes(` ${normalizedPhrase} `);
+}
+
+function compareFilePreference(a: UploadedPdf, b: UploadedPdf): number {
+  const copyPenalty = (name: string) => /\b(copy|duplicate|backup)\b|\(\d+\)/i.test(name) ? 1 : 0;
+  const newestYear = (name: string) => Math.max(0, ...[...name.matchAll(/(20\d{2})/g)].map((match) => Number(match[1])));
+  return copyPenalty(a.name) - copyPenalty(b.name)
+    || newestYear(b.name) - newestYear(a.name)
+    || normalized(a.name).length - normalized(b.name).length
+    || a.name.localeCompare(b.name);
 }
 
 export function matchScore(fileName: string, requirementTitle: string): number {
+  const fileText = normalized(fileName);
+  const titleText = normalized(requirementTitle);
   const fileTokens = new Set(tokens(fileName));
-  const titleTokens = tokens(requirementTitle);
-  if (!titleTokens.length) return 0;
-  const hits = titleTokens.filter((token) => fileTokens.has(token)).length;
-  return hits / titleTokens.length;
+  const titleTokens = [...new Set(tokens(requirementTitle))];
+  let score = titleTokens.length
+    ? titleTokens.filter((token) => fileTokens.has(token)).length / titleTokens.length
+    : 0;
+
+  if (titleText && hasPhrase(fileText, titleText)) score = Math.max(score, 1);
+
+  const targetConcepts = documentLexicon.filter((concept) => concept.signals.some((signal) => hasPhrase(titleText, signal)));
+  for (const concept of targetConcepts) {
+    for (const alias of concept.aliases) {
+      if (hasPhrase(fileText, alias)) {
+        const specificity = Math.min(tokens(alias, true).length * 0.08, 0.18);
+        score = Math.max(score, 0.8 + specificity);
+      }
+    }
+  }
+
+  return Math.min(score, 1);
 }
 
 export function suggestAssignments(
@@ -193,19 +260,36 @@ export function suggestAssignments(
     }
   });
 
-  requirements.forEach((requirement) => {
-    if (matches[requirement.id]) return;
-    const candidates = files
-      .filter((file) => !usedIds.has(file.id) && !usedHashes.has(file.hash))
-      .map((file) => ({ file, score: matchScore(file.name, requirement.title_en) }))
-      .filter(({ score }) => score >= 0.5)
-      .sort((a, b) => b.score - a.score || a.file.name.localeCompare(b.file.name));
-    if (candidates.length && (candidates.length === 1 || candidates[0].score > candidates[1].score)) {
-      matches[requirement.id] = candidates[0].file.id;
-      usedIds.add(candidates[0].file.id);
-      usedHashes.add(candidates[0].file.hash);
-    }
-  });
+  const uniqueAvailable = [...files]
+    .filter((file) => !usedIds.has(file.id) && !usedHashes.has(file.hash))
+    .sort(compareFilePreference)
+    .filter((file, index, all) => all.findIndex((candidate) => candidate.hash === file.hash) === index);
+
+  const candidates = requirements
+    .filter((requirement) => !matches[requirement.id])
+    .flatMap((requirement) => uniqueAvailable.map((file) => ({
+      requirement,
+      file,
+      score: matchScore(file.name, requirement.title_en),
+    })))
+    .filter(({ score }) => score >= 0.45)
+    .sort((a, b) => b.score - a.score || a.requirement.order - b.requirement.order || compareFilePreference(a.file, b.file));
+
+  for (const candidate of candidates) {
+    if (matches[candidate.requirement.id] || usedHashes.has(candidate.file.hash)) continue;
+    matches[candidate.requirement.id] = candidate.file.id;
+    usedIds.add(candidate.file.id);
+    usedHashes.add(candidate.file.hash);
+  }
+
+  const remainingMandatory = requirements.filter((requirement) => requirement.mandatory && !matches[requirement.id]);
+  const alreadySatisfied = requirements.filter((requirement) => matches[requirement.id]);
+  const remainingFiles = uniqueAvailable
+    .filter((file) => !usedHashes.has(file.hash))
+    .filter((file) => !alreadySatisfied.some((requirement) => matchScore(file.name, requirement.title_en) >= 0.45));
+  if (remainingMandatory.length === 1 && remainingFiles.length === 1) {
+    matches[remainingMandatory[0].id] = remainingFiles[0].id;
+  }
   return matches;
 }
 
