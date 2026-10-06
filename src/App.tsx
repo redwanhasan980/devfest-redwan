@@ -63,6 +63,8 @@ export default function App() {
   const l = (en: string, bn: string) => language === 'bn' ? bn : en;
   const requirementsInput = useRef<HTMLInputElement>(null);
   const pdfInput = useRef<HTMLInputElement>(null);
+  const requirementPdfInput = useRef<HTMLInputElement>(null);
+  const uploadRequirementId = useRef<string | null>(null);
 
   useEffect(() => { try { localStorage.setItem('nothisetu-language', language); } catch { /* Storage is optional. */ } document.documentElement.lang = language; }, [language]);
   useEffect(() => {
@@ -149,7 +151,7 @@ export default function App() {
   }
 
   async function processFiles(selected: File[]) {
-    if (!selected.length || uploadLock.current || generating) return;
+    if (!selected.length || uploadLock.current || generating) return [];
     uploadLock.current = true;
     clearGenerated(); setPreviousMatches(null);
     setProcessing(true); setErrors([]); setNotice('');
@@ -180,6 +182,31 @@ export default function App() {
     if (newFiles.length) setFiles((current) => [...current, ...newFiles]);
     setErrors(newErrors); setProcessing(false); uploadLock.current = false;
     if (pdfInput.current) pdfInput.current.value = '';
+    return newFiles;
+  }
+
+  function chooseRequirementPdf(requirementId: string) {
+    if (uploadLock.current || generating || demoLoading) return;
+    uploadRequirementId.current = requirementId;
+    requirementPdfInput.current?.click();
+  }
+
+  async function uploadForRequirement(event: ChangeEvent<HTMLInputElement>) {
+    const input = event.currentTarget;
+    const selected = input.files?.[0];
+    const requirementId = uploadRequirementId.current;
+    input.value = '';
+    uploadRequirementId.current = null;
+    if (!selected || !requirementId) return;
+    const added = await processFiles([selected]);
+    const file = added[0];
+    if (!file) return;
+    if (!canAssignFile(requirementId, file.id, [...files, ...added], assignments.matches)) {
+      setNotice(l('This PDF is already assigned to another requirement. Clear that assignment before reusing it.', 'এই PDF অন্য নথির সঙ্গে মেলানো আছে। আবার ব্যবহার করতে আগের মিল সরান।'));
+      return;
+    }
+    setAssignments((current) => ({ matches: { ...current.matches, [requirementId]: file.id }, expiries: { ...current.expiries, [requirementId]: undefined } }));
+    setNotice(l('PDF uploaded and matched. Review its contents and enter an expiry date if required.', 'PDF যোগ করে মিলিয়ে দেওয়া হয়েছে। বিষয়বস্তু যাচাই করুন এবং প্রয়োজনে মেয়াদ লিখুন।'));
   }
 
   function handleDrop(event: DragEvent<HTMLDivElement>) {
@@ -330,6 +357,7 @@ export default function App() {
 
       <input ref={requirementsInput} hidden type="file" accept="application/json,.json" onChange={handleRequirementsChange} />
       <input ref={pdfInput} hidden multiple type="file" accept="application/pdf,.pdf" onChange={(event) => void processFiles(Array.from(event.target.files ?? []))} />
+      <input ref={requirementPdfInput} hidden type="file" accept="application/pdf,.pdf" onChange={(event) => void uploadForRequirement(event)} />
 
       {errors.length > 0 && <section className="alert-card" role="alert"><AlertTriangle size={19} /><div><strong>{t(language, 'fileErrors')}</strong><ul>{errors.map((error) => <li key={error}>{error}</li>)}</ul></div><button onClick={() => setErrors([])} aria-label={t(language, 'close')}><X size={17} /></button></section>}
       {notice && <div className="notice-card" role="status"><CheckCircle2 size={17} /><span>{notice}</span>{previousMatches && <button className="text-button" onClick={() => { setAssignments((current) => ({ ...current, matches: previousMatches })); setPreviousMatches(null); clearGenerated(); }}><Undo2 size={14} />{l('Undo', 'ফিরিয়ে নিন')}</button>}<button className="notice-close" aria-label={t(language, 'close')} onClick={() => setNotice('')}><X size={15} /></button></div>}
@@ -354,7 +382,7 @@ export default function App() {
                   <div className="requirement-content">
                     <div className="requirement-title"><div><h4>{language === 'bn' ? requirement.title_bn : requirement.title_en}</h4><span>{language === 'bn' ? requirement.title_en : requirement.title_bn}</span></div><div className="tags"><span className={requirement.mandatory ? 'tag required' : 'tag optional'}>{requirement.mandatory ? t(language, 'required') : t(language, 'optional')}</span>{requirement.has_expiry && <span className="tag expiry"><Clock3 size={12} />{t(language, 'expires')}</span>}</div></div>
                     <div className="controls-grid">
-                      <label><span>{t(language, 'matchedFile')}</span><select value={fileId ?? ''} onChange={(event) => changeMatch(requirement.id, event.target.value)}><option value="">{t(language, 'chooseFile')}</option>{files.map((file) => <option key={file.id} value={file.id} disabled={file.id !== fileId && !canAssignFile(requirement.id, file.id, files, assignments.matches)}>{file.name} · {file.pages} {file.pages === 1 ? t(language, 'page') : t(language, 'pages')}</option>)}</select></label>
+                      <div className="file-match-field"><label htmlFor={`match-${requirement.id}`}>{t(language, 'matchedFile')}</label><div className="file-match-picker">{files.length === 0 ? <button id={`match-${requirement.id}`} className="row-upload-button" disabled={processing || demoLoading} onClick={() => chooseRequirementPdf(requirement.id)}><FolderOpen size={16} />{t(language, 'chooseFile')}</button> : <select id={`match-${requirement.id}`} value={fileId ?? ''} disabled={processing} onChange={(event) => { if (event.target.value === '__upload_new_pdf__') { event.currentTarget.value = fileId ?? ''; chooseRequirementPdf(requirement.id); } else changeMatch(requirement.id, event.target.value); }}><option value="">{l('Choose an uploaded PDF…', 'যোগ করা PDF বাছুন…')}</option><option value="__upload_new_pdf__">＋ {l('Upload a PDF from your device…', 'আপনার ডিভাইস থেকে PDF যোগ করুন…')}</option>{files.map((file) => { const unavailable = file.id !== fileId && !canAssignFile(requirement.id, file.id, files, assignments.matches); return <option key={file.id} value={file.id} disabled={unavailable}>{file.name} · {file.pages} {file.pages === 1 ? t(language, 'page') : t(language, 'pages')}{unavailable ? ` — ${l('already assigned', 'অন্য নথিতে ব্যবহৃত')}` : ''}</option>; })}</select>}{files.length > 0 && <button className="row-upload-icon" disabled={processing || demoLoading} onClick={() => chooseRequirementPdf(requirement.id)} aria-label={`${l('Upload PDF for', 'PDF যোগ করুন:')} ${language === 'bn' ? requirement.title_bn : requirement.title_en}`} title={l('Upload and match a new PDF', 'নতুন PDF যোগ করে মিলান')}><UploadCloud size={16} /></button>}</div></div>
                       {requirement.has_expiry && fileId && <label><span>{t(language, 'expiryDate')}</span><input type="date" value={expiry ?? ''} onChange={(event) => changeExpiry(requirement.id, event.target.value)} /></label>}
                       {matched && <button className="preview-button" onClick={() => previewFile(matched)}><Eye size={15} />{t(language, 'preview')}</button>}
                     </div>
